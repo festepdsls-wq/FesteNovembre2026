@@ -314,6 +314,9 @@ section.panel.active { display: block; }
 .cat-top { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
 .cat-top span { font-weight: 600; }
 .cat-top b { white-space: nowrap; }
+.cat-split { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; font-weight: 700; margin-top: 5px; }
+.cat-split .ok { color: var(--up); }
+.cat-split .due { color: var(--down); }
 .cat-due { font-size: 11px; color: var(--down); font-weight: 700; margin-top: 4px; }
 
 details.pagate { margin-top: 18px; }
