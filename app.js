@@ -10,7 +10,7 @@ const FESTE = [
     id: "sagra",
     nome: "Sagra del Pesce",
     breve: "Pesce",            // testo della pillola in alto
-    sheetId: "1h0MtSM25xU9UAJ6Ulj-VFe1PmUS9rj6rS-9UjJsnrVw"
+    sheetId: "1h0MtSM25xU9UAJ6Ulj-VFe1PmUS9rj6rS-9UjJsnrVw",
     date: "6-7-8 e 13-14-15 novembre",
     giorni: ["06/11", "07/11", "08/11", "13/11", "14/11", "15/11"],
     // Divisione in weekend (solo Sagra). I giorni senza data riconoscibile
