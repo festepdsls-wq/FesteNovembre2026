@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Festunità Novembre 2026 — Cruscotto</title>
+<meta name="theme-color" content="#c2030e" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <div class="eyebrow" id="eyebrow">6 – 29 novembre</div>
+  <h1>Festunità Novembre 2026</h1>
+  <div class="header-meta">
+    <span><span id="statusDot" class="status-dot"></span><span id="statusText">aggiornamento...</span></span>
+    <span id="lastUpdate">—</span>
+  </div>
+  <div class="festa-pills" id="festaPills"></div>
+</header>
+
+<main>
+  <div id="errorBanner" class="error-banner"></div>
+
+  <!-- ================= ANDAMENTO ================= -->
+  <section id="panel-andamento" class="panel active">
+    <div class="kpi-grid" id="kpiAndamento"></div>
+    <div class="wk-grid" id="weekendCards"></div>
+    <div class="section-title" id="andamentoTitle">Giorno per giorno</div>
+    <div class="cmp-table" id="andamentoBody"></div>
+  </section>
+
+  <!-- ================= PIATTI ================= -->
+  <section id="panel-piatti" class="panel">
+    <div class="rank-toggle">
+      <button data-mode="nr" class="active">Per pezzi venduti</button>
+      <button data-mode="euro">Per incasso</button>
+    </div>
+    <div class="section-title">Classifica piatti</div>
+    <div class="rank-tot" id="piattiTot"></div>
+    <div id="piattiList" class="rank-list"></div>
+  </section>
+
+  <!-- ================= BIBITE ================= -->
+  <section id="panel-bibite" class="panel">
+    <div class="rank-toggle">
+      <button data-mode="nr" class="active">Per pezzi venduti</button>
+      <button data-mode="euro">Per incasso</button>
+    </div>
+    <div class="section-title">Classifica bibite</div>
+    <div class="rank-tot" id="bibiteTot"></div>
+    <div id="bibiteList" class="rank-list"></div>
+  </section>
+
+  <!-- ================= SPESE ================= -->
+  <section id="panel-spese" class="panel">
+    <div class="kpi-grid" id="kpiSpese"></div>
+    <div id="speseBody"></div>
+  </section>
+</main>
+
+<nav class="tabbar">
+  <button data-panel="andamento" class="active">
+    <span class="icon">📈</span><span>Andamento</span>
+  </button>
+  <button data-panel="piatti">
+    <span class="icon">🍽️</span><span>Piatti</span>
+  </button>
+  <button data-panel="bibite">
+    <span class="icon">🍹</span><span>Bibite</span>
+  </button>
+  <button data-panel="spese">
+    <span class="icon">🧾</span><span>Spese</span>
+  </button>
+</nav>
+
+<script src="app.js"></script>
+</body>
+</html>
