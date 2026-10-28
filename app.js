@@ -708,85 +708,65 @@ function renderSpese() {
   const fatture = [];
   festeSelezionate().forEach((f) => {
     const s = (STATE.data[f.id] || {}).spese;
-    if (s) s.fatture.forEach((x) => fatture.push({ ...x, festa: f.nome }));
+    if (s) s.fatture.forEach((x) => fatture.push(x));
   });
   if (!fatture.length) { renderKpis(kpi, kpiSpeseItems(null)); box.innerHTML = VUOTO; return; }
 
-  const daPagare = fatture.filter((x) => !x.pagata);
-  const pagate = fatture.filter((x) => x.pagata);
   const t = {
     totale: fatture.reduce((s, x) => s + x.importo, 0),
-    pagate: pagate.reduce((s, x) => s + x.importo, 0),
-    daPagare: daPagare.reduce((s, x) => s + x.importo, 0),
+    pagate: fatture.filter((x) => x.pagata).reduce((s, x) => s + x.importo, 0),
+    daPagare: fatture.filter((x) => !x.pagata).reduce((s, x) => s + x.importo, 0),
   };
   renderKpis(kpi, kpiSpeseItems(t));
 
-  const mostraFesta = STATE.festa === "tutte";
-  const voce = (x) => `<div class="spesa${x.pagata ? " pagata" : ""}">
-      <div class="sp-top">
-        <div class="sp-who">${esc(x.beneficiario || x.descrizione)}</div>
-        <div class="sp-amt">${fmtEuroDec(x.importo)}</div>
-      </div>
-      ${x.beneficiario && x.descrizione ? `<div class="sp-desc">${esc(x.descrizione)}</div>` : ""}
-      <div class="sp-tags">
-        ${mostraFesta ? `<span class="tag festa">${esc(x.festa)}</span>` : ""}
-        <span class="tag">${esc(etichettaCategoria(x.categoria))}</span>
-        ${x.rimborsoA ? `<span class="tag rimborso">rimborso a ${esc(x.rimborsoA)}</span>` : ""}
-        ${x.doc ? `<span class="tag soft">doc. ${esc(x.doc)}</span>` : ""}
-        ${x.data ? `<span class="tag soft">${esc(x.data)}</span>` : ""}
-        ${x.pagata ? `<span class="tag ok">pagata ${esc(x.dataPagamento)}${x.metodo ? " · " + esc(x.metodo) : ""}</span>` : ""}
-      </div>
-    </div>`;
-
   // Riepilogo per categoria ricalcolato dalle fatture
-  const perCat = new Map([...CATEGORIE, CATEGORIA_ALTRO].map((c) => [c, { tot: 0, daPagare: 0 }]));
+  const perCat = new Map([...CATEGORIE, CATEGORIA_ALTRO].map((c) => [c, { tot: 0, pagate: 0, daPagare: 0 }]));
   fatture.forEach((x) => {
     const c = perCat.get(x.categoria);
     c.tot += x.importo;
-    if (!x.pagata) c.daPagare += x.importo;
+    if (x.pagata) c.pagate += x.importo;
+    else c.daPagare += x.importo;
   });
   const maxCat = Math.max(...[...perCat.values()].map((c) => c.tot), 1);
-  const righeCat = [...perCat.entries()]
-    .filter(([nome, c]) => nome !== CATEGORIA_ALTRO || c.tot !== 0)
+
+  box.innerHTML = `<div class="section-title">Spese per categoria</div>
+    <div class="cat-list">${[...perCat.entries()]
+      .filter(([nome, c]) => nome !== CATEGORIA_ALTRO || c.tot !== 0)
+      .map(
+        ([nome, c]) => `<div class="cat-row${c.tot ? "" : " zero"}">
+          <div class="cat-top"><span>${esc(etichettaCategoria(nome))}</span><b>${c.tot ? fmtEuroDec(c.tot) : "—"}</b></div>
+          <div class="bar"><span style="width:${(Math.max(c.tot, 0) / maxCat) * 100}%"></span></div>
+          ${c.tot ? `<div class="cat-split"><span class="ok">pagate ${fmtEuroDec(c.pagate)}</span><span class="due">da pagare ${fmtEuroDec(c.daPagare)}</span></div>` : ""}
+        </div>`
+      )
+      .join("")}</div>
+    <div class="section-title">Spese per fornitore</div>
+    <div class="cat-list">${righeFornitori(fatture)}</div>`;
+}
+
+/** Riepilogo per fornitore (colonna BENEFICIARIO), dal più alto al più basso */
+function righeFornitori(fatture) {
+  const perForn = new Map();
+  fatture.forEach((x) => {
+    const nome = x.beneficiario || "(senza beneficiario)";
+    const k = nome.trim().toUpperCase();
+    if (!perForn.has(k)) perForn.set(k, { nome, tot: 0, pagate: 0, daPagare: 0 });
+    const f = perForn.get(k);
+    f.tot += x.importo;
+    if (x.pagata) f.pagate += x.importo;
+    else f.daPagare += x.importo;
+  });
+  const lista = [...perForn.values()].sort((a, b) => b.tot - a.tot);
+  const max = Math.max(...lista.map((f) => f.tot), 1);
+  return lista
     .map(
-      ([nome, c]) => `<div class="cat-row${c.tot ? "" : " zero"}">
-        <div class="cat-top"><span>${esc(etichettaCategoria(nome))}</span><b>${c.tot ? fmtEuroDec(c.tot) : "—"}</b></div>
-        <div class="bar"><span style="width:${(Math.max(c.tot, 0) / maxCat) * 100}%"></span></div>
-        ${c.daPagare ? `<div class="cat-due">da pagare ${fmtEuroDec(c.daPagare)}</div>` : ""}
+      (f) => `<div class="cat-row">
+        <div class="cat-top"><span>${esc(f.nome)}</span><b>${fmtEuroDec(f.tot)}</b></div>
+        <div class="bar"><span style="width:${(Math.max(f.tot, 0) / max) * 100}%"></span></div>
+        <div class="cat-split"><span class="ok">pagate ${fmtEuroDec(f.pagate)}</span><span class="due">da pagare ${fmtEuroDec(f.daPagare)}</span></div>
       </div>`
     )
     .join("");
-
-  // Rimborsi ancora da fare, per persona
-  const rimborsi = new Map();
-  daPagare.filter((x) => x.rimborsoA).forEach((x) => rimborsi.set(x.rimborsoA, (rimborsi.get(x.rimborsoA) || 0) + x.importo));
-
-  // Solo in "Tutte": divisione per festa
-  const perFesta = mostraFesta
-    ? `<div class="section-title">Per festa</div>
-       <div class="cat-list">${FESTE.map((f) => {
-         const ff = fatture.filter((x) => x.festa === f.nome);
-         const tt = ff.reduce((s, x) => s + x.importo, 0);
-         const dp = ff.filter((x) => !x.pagata).reduce((s, x) => s + x.importo, 0);
-         return `<div class="cat-row${tt ? "" : " zero"}"><div class="cat-top"><span>${esc(f.nome)}</span><b>${tt ? fmtEuroDec(tt) : "—"}</b></div>
-           ${dp ? `<div class="cat-due">da pagare ${fmtEuroDec(dp)}</div>` : ""}</div>`;
-       }).join("")}</div>`
-    : "";
-
-  const ordina = (a, b) => (dataOrd(a.data) - dataOrd(b.data)) || b.importo - a.importo;
-
-  box.innerHTML = `
-    <div class="section-title">Da pagare <span class="count">${daPagare.length}</span></div>
-    ${daPagare.length ? `<div class="spese-list">${daPagare.sort(ordina).map(voce).join("")}</div>` : '<div class="empty-state small">Nessuna spesa da pagare</div>'}
-    ${rimborsi.size ? `<div class="section-title">Rimborsi da fare</div>
-      <div class="cat-list">${[...rimborsi.entries()].map(([chi, imp]) => `<div class="cat-row"><div class="cat-top"><span>${esc(chi)}</span><b>${fmtEuroDec(imp)}</b></div></div>`).join("")}</div>` : ""}
-    ${perFesta}
-    <div class="section-title">Per categoria</div>
-    <div class="cat-list">${righeCat}</div>
-    <details class="pagate">
-      <summary>Già pagate <span class="count">${pagate.length}</span> · ${fmtEuroDec(t.pagate)}</summary>
-      ${pagate.length ? `<div class="spese-list">${pagate.sort(ordina).map(voce).join("")}</div>` : '<div class="empty-state small">Nessuna spesa pagata</div>'}
-    </details>`;
 }
 
 function kpiSpeseItems(t) {
