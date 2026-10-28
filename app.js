@@ -44,6 +44,11 @@ const FESTE = [
 // Nomi dei tab (si leggono per NOME, non per gid). Il tab "Scontrini" non si usa.
 const TAB_STATISTICHE = "Statistiche CUCINA";
 const TAB_SPESE = "Registro spese";
+// Incassi (ristorante + ruota + extra) giorno per giorno: tabella DATA | COPERTI | STRISCIATA | ... | INCASSO TOTALE
+const TAB_QUADRATURA = "Riep quadratura cassa";
+const RANGE_QUADRATURA = "A1:K40";
+// Colonne della quadratura (A=0 ... K=10). Usate se l'intestazione non viene letta.
+const COLONNE_QUADRATURA = { data: 0, coperti: 1, ristorante: 2, ruota: 6, extra: 7, totale: 8 };
 
 // Piatti e bibite: riquadro ampio, la tabella si trova da sola
 // (parte da "DESCRIZIONE", si ferma a "Totale generale", bibite dopo "DETTAGLIO BIBITE").
@@ -222,7 +227,7 @@ function normKey(s) {
  */
 function trovaTabellaAndamento(rows) {
   const start = rows.findIndex((r) => String(r[0] || "").trim().toUpperCase() === "DATA");
-  if (start === -1) return rows.length <= 12 ? rows : []; // riquadro stretto: usa tutto
+  if (start === -1) return rows.filter((r) => dateKeyFrom(r[0])); // intestazione non trovata: solo righe con una data
   const out = [];
   for (let i = start + 1; i < rows.length; i++) {
     if (/TOTAL/i.test(String(rows[i][0] || ""))) break;
@@ -242,7 +247,7 @@ function parseAndamento(rowsRiquadro, festa) {
     const coperti = Math.round(num(r[1]));
     const incasso = num(r[3]);
     if (!coperti && !incasso) return;                               // riga vuota o giorno futuro
-    out.push({ rigaFoglio: i, label, dateKey: dateKeyFrom(label), coperti, incasso });
+    out.push({ rigaFoglio: i, label, dateKey: dateKeyFrom(label), coperti, incasso, ristorante: incasso, ruota: 0, extra: 0 });
   });
 
   // Se Google ha "perso" la scritta TOTALE (colonna di date), la riga totale arriva
@@ -258,29 +263,31 @@ function parseAndamento(rowsRiquadro, festa) {
   });
   const pulite = out.filter((r) => !r.scarta);
 
-  // Stessa data su due righe (es. pranzo + cena): si sommano
+  return raggruppaGiorni(pulite, festa);
+}
+
+/** Stessa data su più righe (es. pranzo + cena): si sommano. Poi divisione in weekend. */
+function raggruppaGiorni(righe, festa) {
+  const CAMPI = ["coperti", "incasso", "ristorante", "ruota", "extra"];
   const giorni = [];
   const perData = new Map();
-  pulite.forEach((r) => {
+  righe.forEach((r) => {
     if (r.dateKey && perData.has(r.dateKey)) {
       const g = perData.get(r.dateKey);
-      g.coperti += r.coperti;
-      g.incasso += r.incasso;
+      CAMPI.forEach((c) => { g[c] += r[c]; });
       g.turni += 1;
       return;
     }
     const g = {
       dateKey: r.dateKey,
       label: r.dateKey ? labelFromKey(r.dateKey) : r.label || "riga " + (r.rigaFoglio + 1),
-      coperti: r.coperti,
-      incasso: r.incasso,
       turni: 1,
     };
+    CAMPI.forEach((c) => { g[c] = r[c]; });
     giorni.push(g);
     if (r.dateKey) perData.set(r.dateKey, g);
   });
 
-  // Divisione in weekend (solo se la festa li prevede)
   if (festa.weekend) {
     giorni.forEach((g, i) => {
       let w = festa.weekend.findIndex((wk) => g.dateKey && wk.giorni.includes(g.dateKey));
@@ -288,14 +295,67 @@ function parseAndamento(rowsRiquadro, festa) {
       g.weekend = w;
     });
   }
-
   return { giorni, totale: sommaGiorni(giorni) };
 }
 
 function sommaGiorni(giorni) {
-  const coperti = giorni.reduce((s, g) => s + g.coperti, 0);
-  const incasso = giorni.reduce((s, g) => s + g.incasso, 0);
-  return { coperti, incasso, medio: coperti > 0 ? incasso / coperti : 0, giorni: giorni.length };
+  const somma = (c) => giorni.reduce((s, g) => s + (g[c] || 0), 0);
+  const coperti = somma("coperti");
+  const ristorante = somma("ristorante");
+  return {
+    coperti,
+    incasso: somma("incasso"),
+    ristorante,
+    ruota: somma("ruota"),
+    extra: somma("extra"),
+    medio: coperti > 0 ? ristorante / coperti : 0, // €/pasto = solo ristorante ÷ coperti
+    giorni: giorni.length,
+  };
+}
+
+// ============================================================
+// PARSER — Riep quadratura cassa (A:K)
+// DATA | COPERTI | STRISCIATA | POS | CONTANTI | PROCAPITE | RUOTA | EXTRA / VARIE | INCASSO TOTALE ...
+// Salta PROGRESSIVO (è già un totale) e le righe senza data.
+// ============================================================
+
+function parseQuadratura(rows, festa) {
+  const col = { ...COLONNE_QUADRATURA };
+  let start = 0;
+  const idx = rows.findIndex((r) => normKey(r[0]) === "DATA");
+  if (idx !== -1) {
+    start = idx + 1;
+    const intest = rows[idx].map((x) => normKey(x));
+    const nomi = { coperti: "COPERTI", ristorante: "STRISCIATA", ruota: "RUOTA", extra: "EXTRAVARIE", totale: "INCASSOTOTALE" };
+    Object.entries(nomi).forEach(([k, n]) => {
+      const i = intest.indexOf(n);
+      if (i !== -1) col[k] = i;
+    });
+  }
+  const righe = [];
+  for (let i = start; i < rows.length; i++) {
+    const r = rows[i];
+    const label = String(r[col.data] || "").trim();
+    if (/CONSISTENZA|^TOTALE/i.test(label)) break; // fine tabella
+    const dateKey = dateKeyFrom(label);
+    if (!dateKey) continue; // PROGRESSIVO, righe vuote
+    const coperti = Math.round(num(r[col.coperti]));
+    const ristorante = num(r[col.ristorante]);
+    const ruota = num(r[col.ruota]);
+    const extra = num(r[col.extra]);
+    let incasso = num(r[col.totale]);
+    if (!incasso) incasso = ristorante + ruota + extra;
+    if (!coperti && !incasso) continue; // giorno non ancora fatto
+    righe.push({ rigaFoglio: i, label, dateKey, coperti, incasso, ristorante, ruota, extra });
+  }
+  return raggruppaGiorni(righe, festa);
+}
+
+/** Dati dell'Andamento: la quadratura cassa (tutti gli incassi); se è vuota, la tabella di Statistiche CUCINA */
+function andamentoDi(d) {
+  if (!d) return null;
+  if (d.quadratura && d.quadratura.giorni.length) return d.quadratura;
+  return d.andamento || d.quadratura || null;
 }
 
 // ============================================================
@@ -452,6 +512,7 @@ async function loadFesta(f) {
     ["andamento", TAB_STATISTICHE, f.rangeAndamento, (rows) => parseAndamento(rows, f)],
     ["classifiche", TAB_STATISTICHE, RANGE_CLASSIFICHE, parseClassifiche],
     ["spese", TAB_SPESE, RANGE_SPESE, parseSpese],
+    ["quadratura", TAB_QUADRATURA, RANGE_QUADRATURA, (rows) => parseQuadratura(rows, f)],
   ];
   await Promise.all(
     letture.map(async ([key, tab, range, parser]) => {
@@ -553,7 +614,39 @@ function renderKpis(container, items) {
 // RENDER — Andamento
 // ============================================================
 
+/**
+ * Seconda riga di KPI nell'Andamento:
+ * Spese tot. (tutte le fatture del Registro spese, pagate + da pagare)
+ * Costo/pasto = spese ÷ coperti
+ * Risultato = incasso (tabella DATA/COPERTI) − spese
+ */
+function renderKpiEconomici() {
+  const kpi2 = document.getElementById("kpiAndamento2");
+  if (!caricato()) {
+    renderKpis(kpi2, [{ label: "Spese tot.", value: "—" }, { label: "Costo/pasto", value: "—" }, { label: "Risultato", value: "—" }]);
+    return;
+  }
+  let spese = 0, incasso = 0, coperti = 0, ciSonoDati = false;
+  festeSelezionate().forEach((f) => {
+    const d = STATE.data[f.id] || {};
+    if (d.spese) d.spese.fatture.forEach((x) => { spese += x.importo; ciSonoDati = true; });
+    const a = andamentoDi(d);
+    if (a) {
+      incasso += a.totale.incasso;
+      coperti += a.totale.coperti;
+      if (a.giorni.length) ciSonoDati = true;
+    }
+  });
+  const risultato = incasso - spese;
+  renderKpis(kpi2, [
+    { label: "Spese tot.", value: ciSonoDati ? fmtEuro(spese) : "—" },
+    { label: "Costo/pasto", value: coperti && spese ? fmtEuroDec(spese / coperti) : "—" },
+    { label: "Risultato", value: ciSonoDati ? (risultato < 0 ? "−" : "") + fmtEuro(Math.abs(risultato)) : "—" },
+  ]);
+}
+
 function renderAndamento() {
+  renderKpiEconomici();
   const kpi = document.getElementById("kpiAndamento");
   const box = document.getElementById("andamentoBody");
   const extra = document.getElementById("weekendCards");
@@ -563,7 +656,7 @@ function renderAndamento() {
 
   if (STATE.festa === "tutte") {
     const righe = FESTE.map((f) => {
-      const a = (STATE.data[f.id] || {}).andamento;
+      const a = andamentoDi(STATE.data[f.id]);
       return { f, tot: a ? a.totale : sommaGiorni([]) };
     });
     const tot = sommaGiorni(righe.map((r) => r.tot));
@@ -584,7 +677,7 @@ function renderAndamento() {
   }
 
   const f = FESTE.find((x) => x.id === STATE.festa);
-  const a = (STATE.data[f.id] || {}).andamento;
+  const a = andamentoDi(STATE.data[f.id]);
   document.getElementById("andamentoTitle").textContent = "Giorno per giorno";
   if (!a || a.giorni.length === 0) {
     renderKpis(kpi, kpiAndamentoItems(null));
@@ -641,8 +734,14 @@ function tableHead(primaColonna) {
   return `<div class="cmp-head"><div>${primaColonna}</div><div class="c-num">Incasso</div><div class="c-num">Coperti</div><div class="c-num">€/pasto</div></div>`;
 }
 function numCells(t) {
-  const medio = t.coperti ? t.incasso / t.coperti : 0;
-  return `<div class="c-num"><b>${fmtEuro(t.incasso)}</b></div>
+  const medio = t.coperti ? (t.ristorante || 0) / t.coperti : 0;
+  const dett = [];
+  if (t.ruota || t.extra) {
+    dett.push("rist. " + fmtEuro(t.ristorante || 0));
+    if (t.ruota) dett.push("ruota " + fmtEuro(t.ruota));
+    if (t.extra) dett.push("extra " + fmtEuro(t.extra));
+  }
+  return `<div class="c-num"><b>${fmtEuro(t.incasso)}</b>${dett.length ? `<span class="dett">${dett.join(" · ")}</span>` : ""}</div>
     <div class="c-num">${fmtInt(t.coperti)}</div>
     <div class="c-num">${t.coperti ? fmtEuroDec(medio) : "—"}</div>`;
 }
@@ -925,6 +1024,19 @@ function showDebugPanel() {
       });
       const tt = d.andamento.totale;
       t += `  TOTALE ricalcolato: coperti ${tt.coperti} · incasso ${tt.incasso.toFixed(2)} · €/pasto ${tt.medio.toFixed(2)}\n`;
+    }
+
+    t += `\n--- INCASSI · tab "${TAB_QUADRATURA}" · range ${RANGE_QUADRATURA}  (usati per Incasso tot. e Risultato)\n`;
+    if (d.errors.quadratura) t += "  ERRORE: " + d.errors.quadratura + "\n";
+    t += "  URL: " + d.urls.quadratura + "\n  Prime righe grezze (colonne A..K):\n";
+    t += rawTable(d.raw.quadratura, 10);
+    if (d.quadratura) {
+      d.quadratura.giorni.forEach((g) => {
+        t += `   - ${g.label}  coperti ${g.coperti}  ristorante ${g.ristorante.toFixed(2)}  ruota ${g.ruota.toFixed(2)}  extra ${g.extra.toFixed(2)}  TOTALE ${g.incasso.toFixed(2)}\n`;
+      });
+      const q = d.quadratura.totale;
+      t += `  TOTALE ricalcolato: incasso ${q.incasso.toFixed(2)} (ristorante ${q.ristorante.toFixed(2)} + ruota ${q.ruota.toFixed(2)} + extra ${q.extra.toFixed(2)})\n`;
+      if (!d.quadratura.giorni.length) t += "  Quadratura vuota: l'Andamento usa la tabella di Statistiche CUCINA (solo ristorante)\n";
     }
 
     t += `\n--- PIATTI / BIBITE · tab "${TAB_STATISTICHE}" · range ${RANGE_CLASSIFICHE}\n`;
