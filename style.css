@@ -151,6 +151,10 @@ section.panel.active { display: block; }
   text-overflow: ellipsis;
 }
 
+/* Seconda riga KPI (spese / costo pasto / risultato): più vicina alla prima */
+.kpi-grid.kpi-economici { margin-top: -6px; }
+.kpi-economici .kpi-card { background: var(--rosso-scuro); border-color: var(--rosso); }
+
 /* Weekend (solo Sagra) */
 .wk-grid {
   display: grid;
@@ -218,6 +222,8 @@ section.panel.active { display: block; }
   width: 100%;
 }
 .c-num { text-align: right; white-space: nowrap; }
+.c-num .dett { display: block; white-space: normal; font-size: 9px; font-weight: 500; color: var(--ink-soft); line-height: 1.25; margin-top: 2px; }
+.cmp-row.total .c-num .dett { color: rgba(255, 255, 255, 0.7); }
 .cmp-row .c-day { font-weight: 700; line-height: 1.2; }
 .cmp-row .c-day .sub {
   display: block;
