@@ -19,7 +19,7 @@ const FESTE = [
       { nome: "1° weekend", giorni: ["06/11", "07/11", "08/11"] },
       { nome: "2° weekend", giorni: ["13/11", "14/11", "15/11"] },
     ],
-    rangeAndamento: "B34:E42",
+    rangeAndamento: "B1:E80", // la tabella DATA/COPERTI/€ PASTO/INCASSO viene trovata da sola
   },
   {
     id: "piemontese",
@@ -28,7 +28,7 @@ const FESTE = [
     sheetId: "1BIc3mLr97D6etvreEgDySPmieKZvYE6jN5b7MnhKnSM",
     date: "21-22 novembre",
     giorni: ["21/11", "22/11"],
-    rangeAndamento: "B34:E39",
+    rangeAndamento: "B1:E80",
   },
   {
     id: "toscano",
@@ -37,7 +37,7 @@ const FESTE = [
     sheetId: "1C-cr80QGoKzzMpY2DykX9FcDQ-YjRIPWp6Zdw9wLs28",
     date: "27-28-29 novembre",
     giorni: ["27/11", "28/11", "29/11"],
-    rangeAndamento: "B34:E39",
+    rangeAndamento: "B1:E80",
   },
 ];
 
@@ -93,7 +93,8 @@ function gvizUrl(sheetId, sheetName, range) {
     headers: "0", // niente "righe intestazione" indovinate da Google: arriva tutto come dati
     _cb: Date.now().toString(),
   });
-  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?${params.toString()}`;
+  // spazi come %20 (non "+"), identico all'URL che si prova a mano nel browser
+  return `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?${params.toString().replace(/\+/g, "%20")}`;
 }
 
 function parseCsv(text) {
@@ -127,7 +128,7 @@ async function fetchCsv(url) {
   try {
     res = await fetch(url, { cache: "no-store" });
   } catch (err) {
-    throw new Error("errore di rete (" + err.message + ")");
+    throw new Error("errore di rete (" + err.message + "). Di solito: foglio non condiviso con \"chiunque abbia il link\", oppure connessione assente");
   }
   if (!res.ok) throw new Error("errore HTTP " + res.status);
   const text = await res.text();
@@ -214,7 +215,24 @@ function normKey(s) {
 // Salta intestazione, TOTALE e righe vuote. I totali li ricalcola l'app.
 // ============================================================
 
-function parseAndamento(rows, festa) {
+/**
+ * Trova da sola la tabella "DATA | COPERTI | €/PASTO | INCASSO" dentro il riquadro letto:
+ * parte dalla riga con "DATA" in colonna B e si ferma alla riga TOTALE.
+ * Così non importa in quale riga del foglio si trova.
+ */
+function trovaTabellaAndamento(rows) {
+  const start = rows.findIndex((r) => String(r[0] || "").trim().toUpperCase() === "DATA");
+  if (start === -1) return rows.length <= 12 ? rows : []; // riquadro stretto: usa tutto
+  const out = [];
+  for (let i = start + 1; i < rows.length; i++) {
+    if (/TOTAL/i.test(String(rows[i][0] || ""))) break;
+    out.push(rows[i]);
+  }
+  return out;
+}
+
+function parseAndamento(rowsRiquadro, festa) {
+  const rows = trovaTabellaAndamento(rowsRiquadro);
   const out = [];
   rows.forEach((r, i) => {
     const label = String(r[0] || "").trim();
@@ -906,8 +924,19 @@ function showDebugPanel() {
 
     t += `\n--- ANDAMENTO · tab "${TAB_STATISTICHE}" · range ${f.rangeAndamento}\n`;
     if (d.errors.andamento) t += "  ERRORE: " + d.errors.andamento + "\n";
-    t += "  URL: " + d.urls.andamento + "\n  Righe grezze (attese: intestazione, giorni, TOTALE):\n";
-    t += rawTable(d.raw.andamento, 20);
+    t += "  URL: " + d.urls.andamento + "\n";
+    if (d.raw.andamento) {
+      const ra = d.raw.andamento;
+      const iData = ra.findIndex((r) => String(r[0] || "").trim().toUpperCase() === "DATA");
+      if (iData === -1) {
+        t += "  ATTENZIONE: riga con \"DATA\" in colonna B non trovata. Righe grezze:\n" + rawTable(ra, 20);
+      } else {
+        t += `  Tabella trovata alla riga ${iData + 1} del foglio (DATA, giorni, TOTALE):\n`;
+        t += rawTable(ra.slice(iData, iData + 12), 12);
+      }
+    } else {
+      t += rawTable(null);
+    }
     if (d.andamento) {
       t += "  Giorni letti (intestazione/TOTALE/vuote scartate):\n";
       d.andamento.giorni.forEach((g) => {
