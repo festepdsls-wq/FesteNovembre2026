@@ -1,5 +1,5 @@
 // Alzare il numero di versione a OGNI modifica dei file dell'app.
-const CACHE_NAME = "festenov26-shell-v1";
+const CACHE_NAME = "festenov26-shell-v2";
 const SHELL_FILES = [
   "./index.html",
   "./style.css",
