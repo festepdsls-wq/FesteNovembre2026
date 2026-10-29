@@ -559,14 +559,21 @@ async function refreshData() {
 // FORMATTAZIONE
 // ============================================================
 
+/** Separatore delle migliaia sempre presente (anche 5.724, che il browser altrimenti scrive 5724) */
+function migliaia(n, decimali) {
+  const neg = n < 0;
+  const [int, dec] = Math.abs(n).toFixed(decimali).split(".");
+  const conPunti = int.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return (neg ? "-" : "") + conPunti + (dec ? "," + dec : "");
+}
 function fmtEuro(n) {
-  return n.toLocaleString("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
+  return migliaia(n, 0) + " €";
 }
 function fmtEuroDec(n) {
-  return n.toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return migliaia(n, 2) + " €";
 }
 function fmtInt(n) {
-  return Math.round(n).toLocaleString("it-IT");
+  return migliaia(n, 0);
 }
 function esc(s) {
   return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));

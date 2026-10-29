@@ -2,18 +2,26 @@
 
 :root {
   /* Palette allineata alla Provinciale 2026 */
-  --rosso: #c2030e;
-  --rosso-scuro: #8c0409;
-  --rosso-tint: #fdecec;
-  --bg: #f6f4f1;
+  /* Palette Novembre 2026 — scelta da Valentina */
+  --bordeaux: #922B35;
+  --avorio: #F6F3EF;
+  --inchiostro: #23385B;
+  --rosa: #E9D9D5;
+  --oro: #D7B56D;
+
+  /* Nomi usati nel resto del file (non toccare: puntano alla palette sopra) */
+  --rosso: var(--bordeaux);
+  --rosso-scuro: #7a222b;
+  --rosso-tint: var(--rosa);
+  --bg: var(--avorio);
   --card: #ffffff;
-  --ink: #201417;
-  --ink-soft: #6b5d5f;
-  --navy: #0b1f4a;
-  --navy-line: #16336e;
-  --giallo: #f7ff2e;
-  --up: #1e8a45;
-  --down: #c62828;
+  --ink: #2a2a33;
+  --ink-soft: #7a7270;
+  --navy: var(--inchiostro);
+  --navy-line: var(--inchiostro);
+  --giallo: #ffffff;        /* i numeri nei riquadri blu ora sono bianchi */
+  --up: #4f7a5a;            /* verde salvia: "pagate" */
+  --down: var(--bordeaux);  /* "da pagare" */
   --line: rgba(0, 0, 0, 0.08);
   --radius: 14px;
 }
@@ -40,7 +48,10 @@ button { font-family: inherit; cursor: pointer; }
 .app-header {
   padding: 20px 18px 12px;
   padding-top: calc(20px + env(safe-area-inset-top));
-  background: linear-gradient(180deg, var(--rosso) 0%, var(--rosso-scuro) 100%);
+  background: var(--bordeaux);
+  margin: 10px 12px 0;
+  border-radius: 18px;
+  box-shadow: 0 4px 14px rgba(146, 43, 53, 0.18);
   position: sticky;
   top: 0;
   z-index: 10;
@@ -50,7 +61,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #ffe4b8;
+  color: var(--oro);
   font-weight: 700;
   margin-bottom: 2px;
 }
@@ -76,15 +87,15 @@ button { font-family: inherit; cursor: pointer; }
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #ffe27a;
+  background: var(--oro);
   margin-right: 5px;
   animation: pulse 2.4s infinite;
 }
 .status-dot.stale { background: #ffffff; animation: none; opacity: 0.6; }
 @keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(255, 226, 122, 0.55); }
-  70% { box-shadow: 0 0 0 6px rgba(255, 226, 122, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 226, 122, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(215, 181, 109, 0.55); }
+  70% { box-shadow: 0 0 0 6px rgba(215, 181, 109, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(215, 181, 109, 0); }
 }
 
 /* Pillole feste */
@@ -99,18 +110,19 @@ button { font-family: inherit; cursor: pointer; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 7px 4px;
+  padding: 7px 2px;
+  font-size: 11.5px !important;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.16);
   color: #ffffff;
   font-weight: 700;
   font-size: 12px;
 }
 .festa-pills button.active {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: var(--rosso);
+  background: var(--avorio);
+  border-color: var(--avorio);
+  color: var(--bordeaux);
 }
 
 main { padding: 16px; max-width: 640px; margin: 0 auto; }
@@ -131,20 +143,23 @@ section.panel.active { display: block; }
   border-radius: var(--radius);
   padding: 12px 6px;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: none;
   min-width: 0;
 }
 .kpi-card .label {
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.65);
-  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 600;
+  margin-bottom: 2px;
 }
 .kpi-card .value {
-  font-family: "Anton", sans-serif;
-  font-weight: 400;
-  font-size: 19px;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
+  font-size: clamp(18px, 5.6vw, 28px);  /* numeri grandi: si adattano alla larghezza del telefono */
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   color: var(--giallo);
   white-space: nowrap;
   overflow: hidden;
@@ -153,7 +168,13 @@ section.panel.active { display: block; }
 
 /* Seconda riga KPI (spese / costo pasto / risultato): più vicina alla prima */
 .kpi-grid.kpi-economici { margin-top: -6px; }
-.kpi-economici .kpi-card { background: var(--rosso-scuro); border-color: var(--rosso); }
+.kpi-economici .kpi-card { background: var(--rosa); border-color: var(--rosa); }
+.kpi-economici .kpi-card .label,
+.kpi-economici .kpi-card .value { color: var(--bordeaux); }
+/* Risultato (terzo riquadro): bordeaux pieno, etichetta oro */
+.kpi-economici .kpi-card:last-child { background: var(--bordeaux); border-color: var(--bordeaux); }
+.kpi-economici .kpi-card:last-child .label { color: var(--oro); }
+.kpi-economici .kpi-card:last-child .value { color: #ffffff; }
 
 /* Weekend (solo Sagra) */
 .wk-grid {
@@ -166,13 +187,12 @@ section.panel.active { display: block; }
 .wk-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-left: 4px solid var(--rosso);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  padding: 12px 14px;
 }
-.wk-name { font-weight: 800; font-size: 13px; }
+.wk-name { font-weight: 800; font-size: 16px; color: var(--inchiostro); }
 .wk-dates { font-size: 10.5px; color: var(--ink-soft); margin-bottom: 6px; }
-.wk-val { font-family: "Anton", sans-serif; font-weight: 400; font-size: 20px; color: var(--rosso); }
+.wk-val { font-family: "Manrope", sans-serif; font-weight: 800; font-size: clamp(20px, 6vw, 28px); letter-spacing: -0.02em; color: var(--bordeaux); }
 .wk-sub { font-size: 11px; color: var(--ink-soft); }
 
 .section-title {
@@ -235,8 +255,8 @@ section.panel.active { display: block; }
 .cmp-row.future { opacity: 0.45; box-shadow: none; background: transparent; border-style: dashed; }
 .cmp-row.total { background: var(--navy); border-color: var(--navy-line); color: #fff; }
 .cmp-row.total b { color: var(--giallo); }
-.cmp-row.subtotal { background: #e9ecf3; border-color: transparent; color: var(--navy); }
-.cmp-row.subtotal b { color: var(--navy); }
+.cmp-row.subtotal { background: var(--rosa); border-color: transparent; color: var(--bordeaux); }
+.cmp-row.subtotal b { color: var(--bordeaux); }
 .cmp-row.as-link { font-family: inherit; }
 .cmp-row.as-link .nm::after { content: " ›"; color: var(--rosso); }
 .group-head {
@@ -275,7 +295,7 @@ section.panel.active { display: block; }
   border-radius: 10px;
   border: 1px solid var(--line);
 }
-.rank-item .pos { font-family: "Anton", sans-serif; font-weight: 400; color: var(--rosso); font-size: 13px; }
+.rank-item .pos { font-family: "Manrope", sans-serif; font-weight: 800; color: var(--oro); font-size: 14px; }
 .rank-item .name { font-size: 13px; font-weight: 600; line-height: 1.25; min-width: 0; }
 .rank-item .val { font-size: 13px; font-weight: 700; white-space: nowrap; text-align: right; }
 
@@ -302,13 +322,13 @@ section.panel.active { display: block; }
   font-weight: 700;
   padding: 2px 7px;
   border-radius: 6px;
-  background: #e9ecf3;
-  color: var(--navy);
+  background: var(--rosa);
+  color: var(--inchiostro);
 }
 .tag.soft { background: rgba(0, 0, 0, 0.05); color: var(--ink-soft); font-weight: 600; }
 .tag.festa { background: var(--navy); color: #fff; }
-.tag.rimborso { background: #fdf0d5; color: #a3720c; }
-.tag.ok { background: #e3f3e8; color: var(--up); }
+.tag.rimborso { background: #f3e8cf; color: #8a6a24; }
+.tag.ok { background: #e4ece5; color: var(--up); }
 
 .cat-row {
   background: var(--card);
@@ -345,7 +365,7 @@ nav.tabbar {
   left: 0;
   right: 0;
   display: flex;
-  background: linear-gradient(0deg, var(--rosso-scuro) 0%, var(--rosso) 100%);
+  background: var(--bordeaux);
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   z-index: 20;
 }
@@ -364,7 +384,7 @@ nav.tabbar button {
   gap: 3px;
 }
 nav.tabbar button .icon { font-size: 18px; }
-nav.tabbar button.active { color: #ffffff; background: rgba(255, 255, 255, 0.18); }
+nav.tabbar button.active { color: var(--bordeaux); background: var(--avorio); }
 
 /* ---------- Stati ---------- */
 .empty-state {
@@ -377,8 +397,8 @@ nav.tabbar button.active { color: #ffffff; background: rgba(255, 255, 255, 0.18)
 .empty-state.small { padding: 12px; font-size: 12px; }
 
 .error-banner {
-  background: #fdecec;
-  border: 1px solid var(--down);
+  background: var(--rosa);
+  border: 1px solid var(--bordeaux);
   color: var(--down);
   border-radius: 10px;
   padding: 10px 12px;
