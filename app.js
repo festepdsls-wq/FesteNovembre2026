@@ -835,7 +835,9 @@ function renderSpese() {
   });
   const maxCat = Math.max(...[...perCat.values()].map((c) => c.tot), 1);
 
-  box.innerHTML = `<div class="section-title">Spese per categoria</div>
+  const nForn = new Set(fatture.map((x) => (x.beneficiario || "").trim().toUpperCase())).size;
+  box.innerHTML = `<details class="sezione" data-sez="categorie"${SEZIONI_APERTE.categorie ? " open" : ""}>
+    <summary>Spese per categoria</summary>
     <div class="cat-list">${[...perCat.entries()]
       .filter(([nome, c]) => nome !== CATEGORIA_ALTRO || c.tot !== 0)
       .map(
@@ -846,9 +848,19 @@ function renderSpese() {
         </div>`
       )
       .join("")}</div>
-    <div class="section-title">Spese per fornitore</div>
-    <div class="cat-list">${righeFornitori(fatture)}</div>`;
+    </details>
+    <details class="sezione" data-sez="fornitori"${SEZIONI_APERTE.fornitori ? " open" : ""}>
+      <summary>Spese per fornitore <span class="count">${nForn}</span></summary>
+      <div class="cat-list">${righeFornitori(fatture)}</div>
+    </details>`;
 }
+
+// Sezioni del tab Spese aperte/chiuse: si ricorda la scelta anche quando i dati si aggiornano
+const SEZIONI_APERTE = { categorie: true, fornitori: false };
+document.getElementById("speseBody").addEventListener("toggle", (e) => {
+  const d = e.target;
+  if (d.dataset && d.dataset.sez) SEZIONI_APERTE[d.dataset.sez] = d.open;
+}, true);
 
 /** Riepilogo per fornitore (colonna BENEFICIARIO), dal più alto al più basso */
 function righeFornitori(fatture) {
@@ -862,7 +874,8 @@ function righeFornitori(fatture) {
     if (x.pagata) f.pagate += x.importo;
     else f.daPagare += x.importo;
   });
-  const lista = [...perForn.values()].sort((a, b) => b.tot - a.tot);
+  // Ordine alfabetico A → Z (senza badare a maiuscole e accenti)
+  const lista = [...perForn.values()].sort((a, b) => a.nome.localeCompare(b.nome, "it", { sensitivity: "base" }));
   const max = Math.max(...lista.map((f) => f.tot), 1);
   return lista
     .map(

@@ -244,6 +244,7 @@ section.panel.active { display: block; }
 .c-num { text-align: right; white-space: nowrap; }
 .c-num .dett { display: block; white-space: normal; font-size: 9px; font-weight: 500; color: var(--ink-soft); line-height: 1.25; margin-top: 2px; }
 .cmp-row.total .c-num .dett { color: rgba(255, 255, 255, 0.7); }
+.cmp-row.subtotal .c-num .dett { color: #4a4245; }  /* subtotale weekend (sfondo rosa): grigio scuro */
 .cmp-row .c-day { font-weight: 700; line-height: 1.2; }
 .cmp-row .c-day .sub {
   display: block;
@@ -344,6 +345,31 @@ section.panel.active { display: block; }
 .cat-split .ok { color: var(--up); }
 .cat-split .due { color: var(--down); }
 .cat-due { font-size: 11px; color: var(--down); font-weight: 700; margin-top: 4px; }
+
+/* Sezioni apribili del tab Spese (tocca il titolo) */
+details.sezione { margin-bottom: 6px; }
+details.sezione summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  padding: 12px 2px 10px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink);
+}
+details.sezione summary::-webkit-details-marker { display: none; }
+details.sezione summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--bordeaux);
+  font-size: 14px;
+  transition: transform 0.2s;
+  transform: rotate(-90deg);
+}
+details.sezione[open] summary::after { transform: rotate(0deg); }
+details.sezione summary .count { background: var(--inchiostro); color: #fff; border-radius: 999px; font-size: 11px; padding: 1px 7px; }
 
 details.pagate { margin-top: 18px; }
 details.pagate summary {
