@@ -25,7 +25,7 @@ const FESTE = [
     id: "piemontese",
     nome: "Piemontese",
     breve: "Piemontese",
-    sheetId: "1BIc3mLr97D6etvreEgDySPmieKZvYE6jN5b7MnhKnSM",
+    sheetId: "1WvQN9vf9YL2LvfHeSwM_9AoChCrtcTm1H7Z1iNwJCUA",
     date: "21-22 novembre",
     giorni: ["21/11", "22/11"],
     rangeAndamento: "B1:E80",
