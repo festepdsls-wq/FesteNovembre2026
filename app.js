@@ -20,6 +20,9 @@ const FESTE = [
       { nome: "2° weekend", giorni: ["13/11", "14/11", "15/11"] },
     ],
     rangeAndamento: "B1:E80", // la tabella DATA/COPERTI/€ PASTO/INCASSO viene trovata da sola
+    // Piatti a range fisso (tab "Statistiche CUCINA"): colonna 1 = nome, colonna 2 = valore
+    rangePiattiNr: "M7:N22",   // piatti per pezzi venduti
+    rangePiattiEuro: "P7:Q22", // piatti per incasso
   },
   {
     id: "piemontese",
@@ -363,6 +366,20 @@ function andamentoDi(d) {
 // Colonne del riquadro: 0=M descrizione, 1=N pezzi, 2=O, 3=P descrizione, 4=Q euro
 // ============================================================
 
+/** Range fisso di due colonne (nome | valore): salta righe vuote, intestazioni, totali ed errori */
+function leggiRangeFisso(rows) {
+  const voci = new Map();
+  rows.forEach((r) => {
+    const nome = String(r[0] || "").trim();
+    if (!nome || isErrorCell(nome)) return;
+    if (/^(DESCRIZIONE|TOTALE|NR\.?|€|EURO)/i.test(nome)) return;
+    const v = num(r[1]);
+    if (v <= 0) return;
+    voci.set(nome, (voci.get(nome) || 0) + v);
+  });
+  return [...voci.entries()].map(([nome, valore]) => ({ nome, valore })).sort((a, b) => b.valore - a.valore);
+}
+
 function parseClassifiche(rows) {
   const res = {
     piatti: { nr: leggiBlocco(rows, 0, 1, "piatti"), euro: leggiBlocco(rows, 3, 4, "piatti") },
@@ -514,6 +531,9 @@ async function loadFesta(f) {
     ["spese", TAB_SPESE, RANGE_SPESE, parseSpese],
     ["quadratura", TAB_QUADRATURA, RANGE_QUADRATURA, (rows) => parseQuadratura(rows, f)],
   ];
+  // Range fissi dei piatti, solo per le feste che li hanno in configurazione
+  if (f.rangePiattiNr) letture.push(["piattiNr", TAB_STATISTICHE, f.rangePiattiNr, leggiRangeFisso]);
+  if (f.rangePiattiEuro) letture.push(["piattiEuro", TAB_STATISTICHE, f.rangePiattiEuro, leggiRangeFisso]);
   await Promise.all(
     letture.map(async ([key, tab, range, parser]) => {
       const url = gvizUrl(f.sheetId, tab, range);
@@ -528,6 +548,11 @@ async function loadFesta(f) {
       }
     })
   );
+  // Se ci sono i range fissi, i piatti vengono da lì (le bibite restano lette per intestazioni)
+  if (res.classifiche) {
+    if (res.piattiNr) res.classifiche.piatti.nr = res.piattiNr;
+    if (res.piattiEuro) res.classifiche.piatti.euro = res.piattiEuro;
+  }
   return res;
 }
 
@@ -1066,6 +1091,9 @@ function showDebugPanel() {
     if (d.classifiche) {
       const c = d.classifiche;
       const riass = (arr) => arr.length + " voci" + (arr.length ? " (1ª: " + arr[0].nome + " = " + arr[0].valore + ")" : "");
+      if (f.rangePiattiNr) t += `  (piatti da range fisso: pezzi ${f.rangePiattiNr}${d.errors.piattiNr ? " ERRORE " + d.errors.piattiNr : ""} · incasso ${f.rangePiattiEuro}${d.errors.piattiEuro ? " ERRORE " + d.errors.piattiEuro : ""})\n`;
+      if (d.raw.piattiNr) t += "  Righe grezze " + f.rangePiattiNr + ":\n" + rawTable(d.raw.piattiNr, 20);
+      if (d.raw.piattiEuro) t += "  Righe grezze " + f.rangePiattiEuro + ":\n" + rawTable(d.raw.piattiEuro, 20);
       t += "  Piatti per pezzi:  " + riass(c.piatti.nr) + "\n";
       t += "  Piatti per incasso:" + riass(c.piatti.euro) + "\n";
       t += "  Bibite per pezzi:  " + riass(c.bibite.nr) + "\n";
