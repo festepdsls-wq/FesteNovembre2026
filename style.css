@@ -300,6 +300,36 @@ section.panel.active { display: block; }
 .rank-item .name { font-size: 13px; font-weight: 600; line-height: 1.25; min-width: 0; }
 .rank-item .val { font-size: 13px; font-weight: 700; white-space: nowrap; text-align: right; }
 
+/* Piatti: tendina con il dettaglio giornaliero */
+.rank-item.apribile { cursor: pointer; }
+.rank-item .freccia { display: inline-block; margin-left: 6px; color: var(--bordeaux); font-size: 12px; transition: transform 0.2s; transform: rotate(-90deg); }
+.rank-item.aperto .freccia { transform: rotate(0deg); }
+.rank-item.aperto { border-color: var(--bordeaux); }
+.rank-item .dettaglio {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dt-row {
+  display: grid;
+  grid-template-columns: 74px 1fr 42px 64px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.dt-row.dt-head { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+.dt-row.vuoto { opacity: 0.4; }
+.dt-day { font-weight: 700; white-space: nowrap; }
+.dt-bar { height: 6px; background: var(--rosa); border-radius: 4px; overflow: hidden; }
+.dt-bar span { display: block; height: 100%; background: var(--bordeaux); border-radius: 4px; }
+.dt-nr, .dt-eur { text-align: right; white-space: nowrap; font-weight: 600; }
+.dt-wk { font-size: 11px; font-weight: 800; color: var(--bordeaux); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
+.dt-msg { font-size: 12px; color: var(--ink-soft); }
+
 .bar { height: 4px; background: rgba(0, 0, 0, 0.06); border-radius: 4px; margin-top: 5px; overflow: hidden; }
 .bar span { display: block; height: 100%; background: var(--rosso); border-radius: 4px; }
 
