@@ -56,6 +56,10 @@ const COLONNE_QUADRATURA = { data: 0, coperti: 1, ristorante: 2, ruota: 6, extra
 // Piatti e bibite: riquadro ampio, la tabella si trova da sola
 // (parte da "DESCRIZIONE", si ferma a "Totale generale", bibite dopo "DETTAGLIO BIBITE").
 const RANGE_CLASSIFICHE = "M1:Q60";
+// Dettaglio giornaliero dei piatti (tendina nel tab Piatti): letto SOLO dal tab "Scontrini".
+// Riga 1: un giorno ogni 6 colonne (es. "ven 06/11"); riga 2: CASSA 1 | € CASSA 1 | CASSA 2 | € CASSA 2 | TOTALE NR. | TOTALE €
+const TAB_SCONTRINI = "Scontrini";
+const RANGE_SCONTRINI = "A1:BZ150";
 // Registro spese: elenco fatture A:J (riquadro largo, le righe vuote vengono saltate).
 const RANGE_SPESE = "A1:J400";
 
@@ -366,6 +370,57 @@ function andamentoDi(d) {
 // Colonne del riquadro: 0=M descrizione, 1=N pezzi, 2=O, 3=P descrizione, 4=Q euro
 // ============================================================
 
+// ============================================================
+// PARSER — Scontrini: vendite giorno per giorno di ogni piatto
+// ============================================================
+
+function parseScontrini(rows) {
+  // Riga con le date dei giorni (di solito la prima): quella con più celle "gg/mm"
+  let iDate = -1, best = 0;
+  rows.slice(0, 6).forEach((r, i) => {
+    const n = r.filter((c) => dateKeyFrom(c)).length;
+    if (n > best) { best = n; iDate = i; }
+  });
+  if (iDate === -1) return { giorni: [], piatti: new Map() };
+
+  const rDate = rows[iDate];
+  const rSub = rows[iDate + 1] || [];
+  const inizi = [];
+  rDate.forEach((c, j) => { const k = dateKeyFrom(c); if (k) inizi.push({ k, j }); });
+  const giorni = inizi.map((g, n) => {
+    const fine = n + 1 < inizi.length ? inizi[n + 1].j : g.j + 6;
+    let cNr = -1, cEuro = -1;
+    for (let j = g.j; j < fine; j++) {
+      const h = normKey(rSub[j]);
+      if (h === "TOTALENR") cNr = j;
+      if (h === "TOTALE") cEuro = j;
+    }
+    if (cNr === -1) cNr = g.j + 4;   // posizioni standard se l'intestazione non si legge
+    if (cEuro === -1) cEuro = g.j + 5;
+    return { dateKey: g.k, cNr, cEuro };
+  });
+
+  // Colonna del nome del piatto: quella con "DESCRIZIONE" (di solito B)
+  let cNome = rDate.findIndex((c) => normKey(c).startsWith("DESCRIZIONE"));
+  if (cNome === -1) cNome = 1;
+
+  const piatti = new Map();
+  for (let i = iDate + 2; i < rows.length; i++) {
+    const r = rows[i];
+    const nome = String(r[cNome] || "").trim();
+    const primo = String(r[0] || "").trim().toUpperCase();
+    if (/^TOTALE/.test(primo) || /^TOTALE/i.test(nome)) break;
+    if (!nome || isErrorCell(nome) || /^NR\.?\s*COPERTI/i.test(nome)) continue;
+    const perGiorno = {};
+    giorni.forEach((g) => {
+      const vuoto = String(r[g.cNr] || "").trim() === "" && String(r[g.cEuro] || "").trim() === "";
+      perGiorno[g.dateKey] = vuoto ? null : { nr: num(r[g.cNr]), euro: num(r[g.cEuro]) };
+    });
+    piatti.set(normKey(nome), { nome, perGiorno });
+  }
+  return { giorni: giorni.map((g) => g.dateKey), piatti };
+}
+
 /** Range fisso di due colonne (nome | valore): salta righe vuote, intestazioni, totali ed errori */
 function leggiRangeFisso(rows) {
   const voci = new Map();
@@ -531,6 +586,7 @@ async function loadFesta(f) {
     ["spese", TAB_SPESE, RANGE_SPESE, parseSpese],
     ["quadratura", TAB_QUADRATURA, RANGE_QUADRATURA, (rows) => parseQuadratura(rows, f)],
   ];
+  letture.push(["scontrini", TAB_SCONTRINI, RANGE_SCONTRINI, parseScontrini]);
   // Range fissi dei piatti, solo per le feste che li hanno in configurazione
   if (f.rangePiattiNr) letture.push(["piattiNr", TAB_STATISTICHE, f.rangePiattiNr, leggiRangeFisso]);
   if (f.rangePiattiEuro) letture.push(["piattiEuro", TAB_STATISTICHE, f.rangePiattiEuro, leggiRangeFisso]);
@@ -796,6 +852,9 @@ function giorniPrevisti(f, giorniConDati) {
 // RENDER — Piatti / Bibite
 // ============================================================
 
+// Piatti con la tendina aperta (restano aperti anche quando i dati si aggiornano)
+const PIATTI_APERTI = new Set();
+
 function renderRank(cat) {
   const box = document.getElementById(cat + "List");
   const totBox = document.getElementById(cat + "Tot");
@@ -814,17 +873,68 @@ function renderRank(cat) {
 
   const tot = lista.reduce((s, v) => s + v.valore, 0);
   const fmt = mode === "nr" ? (n) => fmtInt(n) : (n) => fmtEuro(n);
-  totBox.textContent = `${lista.length} voci · totale ${mode === "nr" ? fmtInt(tot) + " pezzi" : fmtEuro(tot)}`;
+  totBox.textContent = `${lista.length} voci · totale ${mode === "nr" ? fmtInt(tot) + " pezzi" : fmtEuro(tot)}` +
+    (cat === "piatti" ? " · tocca un piatto per il dettaglio giornaliero" : "");
   const max = lista[0].valore;
+  const apribile = cat === "piatti";
   box.innerHTML = lista
-    .map(
-      (v, i) => `<div class="rank-item">
+    .map((v, i) => {
+      const k = normKey(v.nome);
+      const aperto = apribile && PIATTI_APERTI.has(k);
+      return `<div class="rank-item${apribile ? " apribile" : ""}${aperto ? " aperto" : ""}"${apribile ? ` data-piatto="${esc(k)}"` : ""}>
         <div class="pos">${i + 1}</div>
         <div class="name">${esc(v.nome)}<div class="bar"><span style="width:${Math.max(2, (v.valore / max) * 100)}%"></span></div></div>
-        <div class="val">${fmt(v.valore)}</div>
-      </div>`
-    )
+        <div class="val">${fmt(v.valore)}${apribile ? '<span class="freccia">▾</span>' : ""}</div>
+        ${aperto ? `<div class="dettaglio">${dettaglioPiatto(k, v.nome)}</div>` : ""}
+      </div>`;
+    })
     .join("");
+}
+
+/** Contenuto della tendina: giorno per giorno (una festa) o festa per festa (Tutte) */
+function dettaglioPiatto(k, nome) {
+  const mode = STATE.rank.piatti;
+  const riga = (label, x, max, cls) => `<div class="dt-row${cls ? " " + cls : ""}">
+      <div class="dt-day">${esc(label)}</div>
+      <div class="dt-bar"><span style="width:${x && max ? Math.max(2, ((mode === "nr" ? x.nr : x.euro) / max) * 100) : 0}%"></span></div>
+      <div class="dt-nr">${x ? fmtInt(x.nr) : "—"}</div>
+      <div class="dt-eur">${x ? fmtEuro(x.euro) : "—"}</div>
+    </div>`;
+  const testa = '<div class="dt-row dt-head"><div class="dt-day"></div><div></div><div class="dt-nr">pezzi</div><div class="dt-eur">incasso</div></div>';
+
+  if (STATE.festa === "tutte") {
+    const righe = FESTE.map((f) => {
+      const c = (STATE.data[f.id] || {}).classifiche;
+      if (!c) return { f, x: null };
+      const nr = (c.piatti.nr.find((v) => normKey(v.nome) === k) || {}).valore || 0;
+      const euro = (c.piatti.euro.find((v) => normKey(v.nome) === k) || {}).valore || 0;
+      return { f, x: nr || euro ? { nr, euro } : null };
+    });
+    const max = Math.max(...righe.map((r) => (r.x ? (mode === "nr" ? r.x.nr : r.x.euro) : 0)), 1);
+    return testa + righe.map((r) => riga(r.f.breve || r.f.nome, r.x, max, r.x ? "" : "vuoto")).join("");
+  }
+
+  const f = FESTE.find((x) => x.id === STATE.festa);
+  const sc = (STATE.data[f.id] || {}).scontrini;
+  if (!sc || !sc.piatti.size) return '<div class="dt-msg">Dettaglio giornaliero non disponibile (tab Scontrini vuoto o non letto)</div>';
+  const p = sc.piatti.get(k);
+  if (!p) return '<div class="dt-msg">Piatto non trovato nel tab Scontrini (il nome deve essere uguale)</div>';
+
+  // Giorno con 0 pezzi e 0 € = non ancora fatto (o niente venduto): riga grigia con "—"
+  const giorni = f.giorni.map((d) => {
+    const x = p.perGiorno[d];
+    return { d, x: x && (x.nr || x.euro) ? x : null };
+  });
+  const max = Math.max(...giorni.map((g) => (g.x ? (mode === "nr" ? g.x.nr : g.x.euro) : 0)), 1);
+  const blocco = (lista) => lista.map((g) => riga(labelFromKey(g.d), g.x, max, g.x ? "" : "vuoto")).join("");
+
+  if (f.weekend) {
+    return testa + f.weekend.map((wk) => {
+      const gg = giorni.filter((g) => wk.giorni.includes(g.d));
+      return `<div class="dt-wk">${esc(wk.nome)}</div>` + blocco(gg);
+    }).join("");
+  }
+  return testa + blocco(giorni);
 }
 
 // ============================================================
@@ -996,6 +1106,15 @@ document.querySelectorAll("nav.tabbar button").forEach((btn) => {
   btn.addEventListener("click", () => switchPanel(btn.dataset.panel));
 });
 
+document.getElementById("piattiList").addEventListener("click", (e) => {
+  const it = e.target.closest("[data-piatto]");
+  if (!it) return;
+  const k = it.dataset.piatto;
+  if (PIATTI_APERTI.has(k)) PIATTI_APERTI.delete(k);
+  else PIATTI_APERTI.add(k);
+  renderRank("piatti");
+});
+
 ["piatti", "bibite"].forEach((cat) => {
   document.querySelectorAll(`#panel-${cat} .rank-toggle button`).forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1098,6 +1217,26 @@ function showDebugPanel() {
       t += "  Piatti per incasso:" + riass(c.piatti.euro) + "\n";
       t += "  Bibite per pezzi:  " + riass(c.bibite.nr) + "\n";
       t += "  Bibite per incasso:" + riass(c.bibite.euro) + "\n";
+    }
+
+    t += `\n--- DETTAGLIO GIORNALIERO PIATTI · tab "${TAB_SCONTRINI}" · range ${RANGE_SCONTRINI}\n`;
+    if (d.errors.scontrini) t += "  ERRORE: " + d.errors.scontrini + "\n";
+    t += "  URL: " + d.urls.scontrini + "\n";
+    if (d.scontrini) {
+      const sc = d.scontrini;
+      t += `  Giorni trovati: ${sc.giorni.length ? sc.giorni.join(", ") : "NESSUNO (manca la riga con le date)"} · voci lette: ${sc.piatti.size}\n`;
+      const mancanti = f.giorni.filter((g) => !sc.giorni.includes(g));
+      if (sc.giorni.length && mancanti.length) t += `  ATTENZIONE: giorni della festa non trovati in Scontrini: ${mancanti.join(", ")}\n`;
+      if (d.classifiche) {
+        d.classifiche.piatti.nr.forEach((v) => {
+          const p = sc.piatti.get(normKey(v.nome));
+          if (!p) { t += `  ATTENZIONE: "${v.nome}" non trovato in Scontrini\n`; return; }
+          const sommaGiorni = Object.values(p.perGiorno).reduce((s, x) => s + (x ? x.nr : 0), 0);
+          if (Math.abs(sommaGiorni - v.valore) > 0.5) {
+            t += `  DIVERSO: "${v.nome}" somma giorni ${sommaGiorni} ≠ totale Statistiche ${v.valore}\n`;
+          }
+        });
+      }
     }
 
     t += `\n--- SPESE · tab "${TAB_SPESE}" · range ${RANGE_SPESE}\n`;
